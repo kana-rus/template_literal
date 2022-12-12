@@ -26,7 +26,7 @@ pub(super) fn tmp(input: TokenStream) -> Result<TokenStream> {
         if &literal[i..=i+1] == "${" {
             let Some(close) = &literal[i+2..].find('}')
                 else {return Err(syn::Error::new(Span::call_site(), "Not closed interpolution"))};
-            interpolations.push((i, *close))
+            interpolations.push((i, i+2+*close))
         }
     }
 
@@ -36,19 +36,18 @@ pub(super) fn tmp(input: TokenStream) -> Result<TokenStream> {
     let (mut format, mut args) = (String::new(), TokenStream::new());
     let comma = quote!(,);
     for (i, (open, close)) in interpolations.into_iter().enumerate() {
-        format +=
-            if i == 0 {
-                &literal[0..open]
-            } else if i == n_interpolutions-1 {
-                &literal[close+1..]
-            } else {
-                if open + 2 == close {return Err(syn::Error::new(Span::call_site(), "Empty interpolution"))}
+        if i == 0 {
+            format += &literal[0..open]
+        }
 
-                comma.to_tokens(&mut args);
-                syn::parse_str::<Expr>(&literal[open+2..close])?.to_tokens(&mut args);
-
-                "{}"
-            }
+        if open + 2 == close {return Err(syn::Error::new(Span::call_site(), "Empty interpolution"))}
+        comma.to_tokens(&mut args);
+        syn::parse_str::<Expr>(&literal[open+2..close])?.to_tokens(&mut args);
+        format += "{}";
+        
+        if i == n_interpolutions-1 {
+            format += &literal[close+1..]
+        }
     }
 
     Ok(quote!(
